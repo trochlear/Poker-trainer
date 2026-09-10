@@ -3,56 +3,119 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>4-Max Poker Trainer</title>
+<title>4-Max Poker Trainer v7.1</title>
 <style>
-html,body{margin:0;min-height:100%;background:#101415;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif}.loading{min-height:100vh;display:grid;place-items:center;text-align:center;padding:24px}.loading b{font-size:22px}.loading div{color:#aab7b7;margin-top:8px}
+html,body{margin:0;min-height:100%;background:#101415;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif}
+.loading{min-height:100vh;display:grid;place-items:center;text-align:center;padding:24px}.loading b{font-size:22px}.loading div{color:#aab7b7;margin-top:8px}
 </style>
 </head>
 <body>
-<div class="loading"><section><b>♠ Poker Trainer 불러오는 중…</b><div>레이아웃 v4</div></section></div>
+<div class="loading"><section><b>♠ Poker Trainer v7.1 불러오는 중…</b><div>상태 저장 · 자동 핸드 · 세션 종료조건</div></section></div>
 <script>
 (async()=>{
-  const base='https://raw.githubusercontent.com/trochlear/Poker-trainer/f3569e17c0a7a37ed921441c1d6918d24a86fe8b/index.html';
-  try{
-    let h=await (await fetch(base,{cache:'no-store'})).text();
-    const css=`<style id="v4-layout-fix">
-      /* Tablet / desktop: human seat and action bar no longer overlap */
-      .seat0{bottom:155px!important;z-index:6!important}
-      .actions{bottom:22px!important;z-index:20!important}
-      .center{top:22%!important}
-      @media(max-width:900px){.table{min-height:800px!important}}
-      @media(max-width:620px){
-        body{padding-bottom:190px!important}
-        .table{min-height:750px!important}
-        .seat0{bottom:165px!important}
-        .actions{position:fixed!important;left:8px!important;right:8px!important;bottom:8px!important;transform:none!important;width:auto!important;z-index:50!important}
-      }
-    </style>`;
-    const patch=`<script>
-      (function(){
-        const oldRender=window.render;
-        if(typeof oldRender==='function'){
-          window.render=function(){
-            oldRender();
-            try{
-              const human=G.players[HUMAN];
-              const status=document.getElementById('status');
-              if(status && human && human.hole && human.hole.length && !document.getElementById('my-hole-status')){
-                status.insertAdjacentHTML('beforeend','<div id="my-hole-status" style="margin-top:9px;padding:7px 10px;border-radius:9px;background:#ffffff12;font-size:17px">🂠 내 패 <b>'+human.hole.map(cardText).join(' ')+'</b></div>');
-              } else if(status && human && document.getElementById('my-hole-status')){
-                document.getElementById('my-hole-status').innerHTML='🂠 내 패 <b>'+human.hole.map(cardText).join(' ')+'</b>';
-              }
-            }catch(e){}
-          };
-          window.render();
-        }
-      })();
-    <\/script>`;
-    h=h.replace('</head>',css+'</head>').replace('</body>',patch+'</body>');
-    document.open();document.write(h);document.close();
-  }catch(e){
-    document.body.innerHTML='<div class="loading"><section><b>불러오기 실패</b><div>새로고침해 주세요.</div></section></div>';
-  }
+const VERSION="7.1", KEY="pokerTrainerStateV71";
+const base='https://raw.githubusercontent.com/trochlear/Poker-trainer/f3569e17c0a7a37ed921441c1d6918d24a86fe8b/index.html';
+try{
+let h=await (await fetch(base,{cache:'no-store'})).text();
+h=h.replace(/resetGame\(\);\s*<\/script>/,'/* boot handled by v7 */</script>');
+const css=`<style id="v7-css">
+.turnBanner{display:none!important}
+.center{top:38%!important}
+.topbar{align-items:flex-start!important}
+.v7badge{display:inline-block;margin-left:8px;padding:3px 7px;border-radius:999px;background:#f5c451;color:#171717;font-size:11px;font-weight:900;vertical-align:middle}
+#v7hud{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 10px;padding:9px;background:#182022;border:1px solid #2a3538;border-radius:12px}
+#v7hud span{padding:6px 9px;background:#ffffff12;border-radius:999px;font-size:12px;font-weight:800}
+#v7hud b{color:#f5c451}
+.v7sizes{width:100%;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+.v7sizes button{padding:7px 9px;font-size:12px}
+#v7settings .settingsGrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+#v7settings .wide{grid-column:1/-1}
+#v7settings label{font-size:10px;color:#aab7b7}
+#v7settings .field{display:flex;flex-direction:column;gap:4px}
+#v7settings input,#v7settings select{width:100%;background:#0d1213;color:#fff;border:1px solid #465153;border-radius:8px;padding:8px}
+#v7settings .check{display:flex;align-items:center;gap:7px;font-size:11px;color:#dbe5e5}
+#v7settings .check input{width:auto}
+#v7sessionmsg{margin-top:8px;padding:7px 8px;background:#ffffff0d;border-radius:8px;font-size:11px;color:#cfdada}
+@media(max-width:900px){
+ .center{top:35%!important}
+ .table{min-height:790px!important}
+}
+@media(max-width:620px){
+ body{padding-bottom:185px!important}
+ .center{top:27%!important}
+ .seat0{bottom:160px!important}
+ .actions{position:fixed!important;left:8px!important;right:8px!important;bottom:8px!important;transform:none!important;width:auto!important;z-index:60!important}
+ #v7hud{position:sticky;top:0;z-index:55;background:#182022f4}
+ #v7settings .settingsGrid{grid-template-columns:1fr 1fr}
+}
+</style>`;
+const patch=`<script>
+(function(){
+const VERSION="7.1", KEY="pokerTrainerStateV71";
+document.title="4-Max Poker Trainer v"+VERSION;
+const title=document.querySelector('.title');
+if(title&&!document.getElementById('v7badge')) title.insertAdjacentHTML('beforeend','<span class="v7badge" id="v7badge">v'+VERSION+'</span>');
+const table=document.getElementById('table');
+if(table&&!document.getElementById('v7hud')){
+ table.insertAdjacentHTML('beforebegin','<div id="v7hud"><span id="v7turn">현재 차례: 준비 중</span><span id="v7pot">Pot <b>0</b></span><span id="v7street">PRE-FLOP</span><span id="v7timer">세션 제한 없음</span></div>');
+}
+const actions=document.getElementById('actions');
+if(actions&&!document.getElementById('v7sizes')){
+ actions.insertAdjacentHTML('beforeend','<div class="v7sizes" id="v7sizes"><button data-f="0.333">⅓ 팟</button><button data-f="0.5">½ 팟</button><button data-f="0.667">⅔ 팟</button><button data-f="1">팟</button></div>');
+}
+const side=document.querySelector('.side');
+const summaryPanel=document.getElementById('summaryGrid')?.closest('.panel');
+if(side&&!document.getElementById('v7settings')){
+ const html='<div class="panel" id="v7settings"><h3>세션 설정 · v'+VERSION+'</h3><div class="settingsGrid">'
+ +'<div class="field wide"><label class="check"><input id="v7auto" type="checkbox" checked> 핸드 종료 후 자동 다음 핸드</label></div>'
+ +'<div class="field"><label>다음 핸드 대기(초)</label><select id="v7nextdelay"><option value="800">0.8</option><option value="1200" selected>1.2</option><option value="1800">1.8</option><option value="2500">2.5</option></select></div>'
+ +'<div class="field"><label>봇 액션 속도(초)</label><select id="v7botdelay"><option value="600">0.6</option><option value="850">0.85</option><option value="1000" selected>1.0</option><option value="1300">1.3</option></select></div>'
+ +'<div class="field"><label>앞으로 몇 분</label><input id="v7mins" type="number" min="0" step="1" placeholder="30"></div>'
+ +'<div class="field"><label>몇 시까지</label><input id="v7until" type="time"></div>'
+ +'<div class="field"><label>최대 핸드 수</label><input id="v7hands" type="number" min="0" step="1" placeholder="50"></div>'
+ +'<div class="field"><label>내 스택 이하면 종료</label><input id="v7loss" type="number" min="0" step="50" placeholder="7000"></div>'
+ +'<div class="field"><label>내 스택 이상이면 종료</label><input id="v7profit" type="number" min="0" step="50" placeholder="13000"></div>'
+ +'<div class="field wide"><label class="check"><input id="v7bust" type="checkbox" checked> 한 명 파산 시 종료</label></div>'
+ +'<div class="field wide"><button class="primary" id="v7apply">설정 적용</button></div>'
+ +'</div><div id="v7sessionmsg">시간이 핸드 도중 끝나면 현재 핸드까지 마친 뒤 멈춥니다.</div></div>';
+ (summaryPanel||side.firstElementChild).insertAdjacentHTML('afterend',html);
+}
+let cfg={auto:true,nextDelay:1200,botDelay:1000,durationEnd:null,untilEnd:null,maxHands:0,stopLoss:0,profitTarget:0,stopOnBust:true,stopped:false,reason:''};
+let botTimer=null,autoTimer=null;
+function round50(n){return Math.max(50,Math.round(n/50)*50)}
+function pack(){return {v:VERSION,cfg:{...cfg},G:{...G,needs:[...(G.needs||new Set())]}}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(pack()))}catch(e){}}
+function load(){try{const x=JSON.parse(localStorage.getItem(KEY)||'null');if(!x||!x.G||!Array.isArray(x.G.players)||x.G.players.length!==4)return false;cfg={...cfg,...x.cfg};G={...x.G,needs:new Set(x.G.needs||[])};return true}catch(e){return false}}
+function clearTimers(){clearTimeout(botTimer);clearTimeout(autoTimer);botTimer=autoTimer=null}
+function endReason(){const now=Date.now(),me=G.players&&G.players[HUMAN];if(cfg.stopped)return cfg.reason||'사용자 정지';if(cfg.durationEnd&&now>=cfg.durationEnd)return'설정한 플레이 시간 종료';if(cfg.untilEnd&&now>=cfg.untilEnd)return'설정한 종료 시각 도달';if(cfg.maxHands>0&&G.handNo>=cfg.maxHands)return'최대 '+cfg.maxHands+'핸드 도달';if(me&&cfg.stopLoss>0&&me.stack<=cfg.stopLoss)return'내 스택 '+cfg.stopLoss+' 이하';if(me&&cfg.profitTarget>0&&me.stack>=cfg.profitTarget)return'내 스택 '+cfg.profitTarget+' 이상';if(cfg.stopOnBust&&G.players&&G.players.some(p=>p.stack<=0))return'플레이어 1명 파산';return''}
+function stop(reason){cfg.stopped=true;cfg.reason=reason||'세션 정지';clearTimers();save();render()}
+function afterHand(){save();const r=endReason();if(r){stop(r);return}if(cfg.auto&&!cfg.stopped&&G.handOver&&living().length>=2)autoTimer=setTimeout(()=>{if(G.handOver&&!cfg.stopped)newHand()},cfg.nextDelay)}
+function remaining(ms){if(ms<=0)return'종료 대기';const m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000);return m?m+'분 '+s+'초':s+'초'}
+function updateHud(){const actor=G.actor==null?'없음':(G.players[G.actor]?.name||'없음');const turn=document.getElementById('v7turn'),pot=document.getElementById('v7pot'),street=document.getElementById('v7street'),timer=document.getElementById('v7timer');if(turn)turn.textContent='현재 차례: '+(cfg.stopped?'세션 정지':(G.handOver?'핸드 종료':actor));if(pot)pot.innerHTML='Pot <b>'+Number(G.pot||0).toLocaleString()+'</b>';if(street)street.textContent=(G.street||'').toUpperCase();const parts=[],now=Date.now();if(cfg.durationEnd)parts.push('남은 '+remaining(cfg.durationEnd-now));if(cfg.untilEnd)parts.push(new Date(cfg.untilEnd).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'까지');if(cfg.maxHands>0)parts.push(G.handNo+'/'+cfg.maxHands+'핸드');if(timer)timer.textContent=cfg.stopped?('정지: '+cfg.reason):(parts.length?parts.join(' · '):'세션 제한 없음')}
+function syncCfg(){const q=id=>document.getElementById(id);if(!q('v7auto'))return;q('v7auto').checked=!!cfg.auto;q('v7nextdelay').value=String(cfg.nextDelay);q('v7botdelay').value=String(cfg.botDelay);q('v7hands').value=cfg.maxHands||'';q('v7loss').value=cfg.stopLoss||'';q('v7profit').value=cfg.profitTarget||'';q('v7bust').checked=!!cfg.stopOnBust}
+function applyCfg(){const q=id=>document.getElementById(id);cfg.auto=q('v7auto').checked;cfg.nextDelay=+q('v7nextdelay').value;cfg.botDelay=+q('v7botdelay').value;cfg.maxHands=Math.max(0,+q('v7hands').value||0);cfg.stopLoss=Math.max(0,+q('v7loss').value||0);cfg.profitTarget=Math.max(0,+q('v7profit').value||0);cfg.stopOnBust=q('v7bust').checked;const mins=Math.max(0,+q('v7mins').value||0);cfg.durationEnd=mins?Date.now()+mins*60000:null;const t=q('v7until').value;if(t){const [hh,mm]=t.split(':').map(Number),d=new Date();d.setHours(hh,mm,0,0);if(d.getTime()<=Date.now())d.setDate(d.getDate()+1);cfg.untilEnd=d.getTime()}else cfg.untilEnd=null;cfg.stopped=false;cfg.reason='';q('v7sessionmsg').textContent='설정 저장됨. 종료조건은 현재 핸드를 끝낸 뒤 확인합니다.';save();render();if(G.handOver)afterHand();else runUntilHuman()}
+document.getElementById('v7apply')?.addEventListener('click',applyCfg);
+const originalRender=render;
+render=function(){originalRender();const human=G.players?.[HUMAN],status=document.getElementById('status');if(status&&human){let box=document.getElementById('v7mycards');const text='🂠 내 패 <b>'+((human.hole||[]).map(cardText).join(' ')||'-')+'</b>';if(!box){status.insertAdjacentHTML('beforeend','<div id="v7mycards" style="margin-top:8px;padding:7px 9px;border-radius:9px;background:#ffffff12;font-size:15px">'+text+'</div>')}else box.innerHTML=text}const nt=document.getElementById('nextHandBtn');if(nt&&cfg.stopped)nt.disabled=true;updateHud();save()};
+const originalReset=resetGame;
+resetGame=function(){clearTimers();localStorage.removeItem(KEY);cfg={auto:true,nextDelay:1200,botDelay:1000,durationEnd:null,untilEnd:null,maxHands:0,stopLoss:0,profitTarget:0,stopOnBust:true,stopped:false,reason:''};originalReset();syncCfg();save()};
+const originalNewHand=newHand;
+newHand=function(){const r=endReason();if(r&&G.handNo>0){stop(r);return}clearTimers();originalNewHand()};
+const originalFinish=finishByFold;finishByFold=function(w){originalFinish(w);afterHand()};
+const originalShow=showdown;showdown=function(){originalShow();afterHand()};
+runUntilHuman=function(){clearTimeout(botTimer);render();if(G.handOver||cfg.stopped)return;if(G.actor===null){advanceStreet();return}if(G.actor===HUMAN)return;const a=G.actor,d=botDecision(a);botTimer=setTimeout(()=>{if(!G.handOver&&!cfg.stopped&&G.actor===a)act(a,d.kind,d.to)},cfg.botDelay)};
+function fractionTarget(frac){const p=G.players[HUMAN],toCall=Math.max(0,G.currentBet-p.streetContrib);let target;if(G.currentBet===0)target=p.streetContrib+round50(G.pot*frac);else target=p.streetContrib+toCall+round50((G.pot+toCall)*frac);const minTo=G.currentBet===0?BB:G.currentBet+G.minRaise,maxTo=p.streetContrib+p.stack;return Math.min(maxTo,Math.max(minTo,round50(target)))}
+document.querySelectorAll('#v7sizes button').forEach(b=>b.addEventListener('click',()=>{if(G.actor!==HUMAN||G.handOver||cfg.stopped)return;act(HUMAN,'raise',fractionTarget(+b.dataset.f))}));
+const oldNew=document.getElementById('newGameBtn');if(oldNew){const clone=oldNew.cloneNode(true);oldNew.replaceWith(clone);clone.addEventListener('click',()=>{if(confirm('저장된 스택과 진행상황까지 초기화하고 새 게임을 시작할까요?'))resetGame()})}
+const next=document.getElementById('nextHandBtn');if(next&&!document.getElementById('v7pause')){next.insertAdjacentHTML('beforebegin','<button id="v7pause">세션 정지</button>');document.getElementById('v7pause').addEventListener('click',()=>{if(cfg.stopped){cfg.stopped=false;cfg.reason='';render();if(G.handOver)afterHand();else runUntilHuman()}else stop('사용자가 세션을 정지함')})}
+const baseRender2=render;render=function(){baseRender2();const p=document.getElementById('v7pause');if(p)p.textContent=cfg.stopped?'세션 재개':'세션 정지'};
+if(load()){syncCfg();render();if(!cfg.stopped){if(G.handOver)afterHand();else runUntilHuman()}}else{originalReset();syncCfg();save();render();runUntilHuman()}
+setInterval(updateHud,1000);
+})();
+<\/script>`;
+h=h.replace('</head>',css+'</head>').replace('</body>',patch+'</body>');
+document.open();document.write(h);document.close();
+}catch(e){document.body.innerHTML='<div class="loading"><section><b>불러오기 실패</b><div>'+String(e)+'</div></section></div>'}
 })();
 </script>
 </body>
