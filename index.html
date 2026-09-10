@@ -125,5 +125,18 @@
   </div>
 </div>
 <script src="app.js?v=80"></script>
+<script>
+(function(){
+  const base=window.render;
+  if(typeof base==='function'){
+    window.render=function(){
+      base();
+      const info=document.getElementById('info');
+      if(info) info.textContent=info.textContent.replace(/버전\s+\S+/,'버전 8.0');
+    };
+    window.render();
+  }
+})();
+</script>
 </body>
 </html>
