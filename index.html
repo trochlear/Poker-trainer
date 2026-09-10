@@ -3,59 +3,127 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Poker Trainer v7.2</title>
-<link rel="stylesheet" href="style.css?v=72">
+<title>Poker Trainer v8.0</title>
+<link rel="stylesheet" href="style.css?v=80">
 </head>
 <body>
-<div class="wrap">
- <div class="top">
-  <div><div class="brand">♠ 4-Max Poker Trainer <span class="badge">v7.2</span></div><div class="sub">단일 페이지 · 자동 저장 · 자동 다음 핸드 · 규칙 기반 봇</div></div>
-  <div class="topBtns"><button id="pause">세션 정지</button><button id="new">새 게임</button></div>
- </div>
-
- <div class="layout">
-  <div class="left">
-   <div class="hud">
-    <div class="chip" id="hTurn">현재 차례: -</div><div class="chip" id="hPot">Pot <b>0</b></div><div class="chip" id="hStreet">PRE-FLOP</div><div class="chip" id="hTimer">세션 제한 없음</div>
-   </div>
-   <div class="table">
-    <div id="seat0" class="seat s0"></div><div id="seat1" class="seat s1"></div><div id="seat2" class="seat s2"></div><div id="seat3" class="seat s3"></div>
-    <div class="center"><div class="street" id="street">PRE-FLOP</div><div class="pot" id="pot">Pot 0</div><div class="board" id="board"></div></div>
-   </div>
-   <div class="controls" id="controls">
-    <div class="ctitle" id="ctitle">내 차례를 기다리는 중</div>
-    <div class="mainActions">
-     <button id="fold" class="danger">다이</button><button id="call">체크/콜</button>
-     <div class="raise"><input id="amount" type="number" step="50" value="250"><button id="raise" class="primary">베팅/레이즈</button></div>
+<input type="checkbox" id="mobilePanelToggle" hidden>
+<div class="app">
+  <header class="top">
+    <div>
+      <div class="brand">♠ 4-Max Poker Trainer <span class="badge">v8.0</span></div>
+      <div class="sub">태블릿/폰 전용 레이아웃 · 자동 저장 · 자동 다음 핸드 · 규칙 기반 봇</div>
     </div>
-    <div class="sizeActions"><button data-f=".333">⅓ 팟</button><button data-f=".5">½ 팟</button><button data-f=".667">⅔ 팟</button><button data-f="1">팟</button></div>
-   </div>
-  </div>
+    <div class="topBtns">
+      <label for="mobilePanelToggle" class="mobileInfoBtn">정보/설정</label>
+      <button id="pause">세션 정지</button>
+      <button id="new">새 게임</button>
+    </div>
+  </header>
 
-  <div class="side">
-   <div class="panel"><h3>현재 상황</h3><div id="status" class="status"></div><div id="info" class="small"></div></div>
-   <div class="panel"><h3>이번 핸드 투자</h3><div id="summary" class="sum"></div></div>
-   <div class="panel">
-    <h3>세션 설정</h3>
-    <div class="grid">
-     <div class="field wide"><label class="check"><input id="auto" type="checkbox" checked> 핸드 종료 후 자동 다음 핸드</label></div>
-     <div class="field"><label>다음 핸드 대기</label><select id="nextDelay"><option value="800">0.8초</option><option value="1200" selected>1.2초</option><option value="1800">1.8초</option><option value="2500">2.5초</option></select></div>
-     <div class="field"><label>봇 액션 속도</label><select id="botDelay"><option value="600">0.6초</option><option value="850">0.85초</option><option value="1000" selected>1.0초</option><option value="1300">1.3초</option></select></div>
-     <div class="field"><label>앞으로 몇 분</label><input id="mins" type="number" min="0" placeholder="30"></div>
-     <div class="field"><label>몇 시까지</label><input id="until" type="time"></div>
-     <div class="field"><label>최대 핸드 수</label><input id="hands" type="number" min="0" placeholder="50"></div>
-     <div class="field"><label>내 스택 이하면 종료</label><input id="loss" type="number" min="0" step="50" placeholder="7000"></div>
-     <div class="field"><label>내 스택 이상이면 종료</label><input id="profit" type="number" min="0" step="50" placeholder="13000"></div>
-     <div class="field wide"><label class="check"><input id="bust" type="checkbox" checked> 한 명 파산하면 세션 종료</label></div>
-     <div class="field wide"><button id="apply" class="primary">설정 적용</button></div>
-    </div><div class="msg" id="msg">시간 제한은 현재 핸드를 끝낸 뒤 적용합니다.</div>
-   </div>
-   <div class="panel"><h3>즉석 코치</h3><div id="coach" class="coach">액션하면 짧게 코멘트합니다.</div></div>
-   <div class="panel"><h3>액션 로그</h3><div id="log" class="log"></div></div>
-   <div class="panel small">봇은 LLM이 아니라 브라우저 안에서 돌아가는 규칙 기반 알고리즘입니다. 패 강도·포지션·가격과 TAG/LAG/콜링 성향을 조합합니다.</div>
+  <div class="layout">
+    <main class="gameArea">
+      <div class="hud">
+        <div class="chip" id="hTurn">현재 차례: -</div>
+        <div class="chip" id="hPot">Pot <b>0</b></div>
+        <div class="chip" id="hStreet">PRE-FLOP</div>
+        <div class="chip" id="hTimer">세션 제한 없음</div>
+      </div>
+
+      <section class="table">
+        <div id="seat0" class="seat s0"></div>
+        <div id="seat1" class="seat s1"></div>
+        <div id="seat2" class="seat s2"></div>
+        <div id="seat3" class="seat s3"></div>
+
+        <div class="center">
+          <div class="street" id="street">PRE-FLOP</div>
+          <div class="pot" id="pot">Pot 0</div>
+          <div class="board" id="board"></div>
+        </div>
+      </section>
+
+      <section class="controls" id="controls">
+        <div class="ctitle" id="ctitle">내 차례를 기다리는 중</div>
+        <div class="mainActions">
+          <button id="fold" class="danger">다이</button>
+          <button id="call">체크/콜</button>
+          <div class="raise">
+            <input id="amount" type="number" step="50" value="250">
+            <button id="raise" class="primary">베팅/레이즈</button>
+          </div>
+        </div>
+        <div class="sizeActions">
+          <button data-f=".333">⅓ 팟</button>
+          <button data-f=".5">½ 팟</button>
+          <button data-f=".667">⅔ 팟</button>
+          <button data-f="1">팟</button>
+        </div>
+      </section>
+    </main>
+
+    <aside class="side">
+      <div class="sideTop">
+        <div class="sideTitle">게임 패널</div>
+        <label for="mobilePanelToggle" class="mobileClose">닫기 ✕</label>
+      </div>
+
+      <input type="radio" name="sideTab" id="tabGame" checked hidden>
+      <input type="radio" name="sideTab" id="tabSession" hidden>
+      <input type="radio" name="sideTab" id="tabLog" hidden>
+
+      <nav class="tabNav">
+        <label for="tabGame">상황</label>
+        <label for="tabSession">세션</label>
+        <label for="tabLog">로그</label>
+      </nav>
+
+      <div class="tabArea">
+        <section class="tabPanel gameTab">
+          <div class="panel compact">
+            <h3>현재 상황</h3>
+            <div id="status" class="status"></div>
+            <div id="info" class="small"></div>
+          </div>
+
+          <div class="panel compact grow">
+            <h3>이번 핸드 투자</h3>
+            <div id="summary" class="sum"></div>
+            <h3 class="coachHeading">즉석 코치</h3>
+            <div id="coach" class="coach">액션하면 짧게 코멘트합니다.</div>
+          </div>
+        </section>
+
+        <section class="tabPanel sessionTab">
+          <div class="panel settingsPanel">
+            <h3>세션 설정</h3>
+            <div class="grid">
+              <div class="field wide"><label class="check"><input id="auto" type="checkbox" checked> 핸드 종료 후 자동 다음 핸드</label></div>
+              <div class="field"><label>다음 핸드 대기</label><select id="nextDelay"><option value="800">0.8초</option><option value="1200" selected>1.2초</option><option value="1800">1.8초</option><option value="2500">2.5초</option></select></div>
+              <div class="field"><label>봇 액션 속도</label><select id="botDelay"><option value="600">0.6초</option><option value="850">0.85초</option><option value="1000" selected>1.0초</option><option value="1300">1.3초</option></select></div>
+              <div class="field"><label>앞으로 몇 분</label><input id="mins" type="number" min="0" placeholder="30"></div>
+              <div class="field"><label>몇 시까지</label><input id="until" type="time"></div>
+              <div class="field"><label>최대 핸드 수</label><input id="hands" type="number" min="0" placeholder="50"></div>
+              <div class="field"><label>내 스택 이하면 종료</label><input id="loss" type="number" min="0" step="50" placeholder="7000"></div>
+              <div class="field"><label>내 스택 이상이면 종료</label><input id="profit" type="number" min="0" step="50" placeholder="13000"></div>
+              <div class="field wide"><label class="check"><input id="bust" type="checkbox" checked> 한 명 파산하면 세션 종료</label></div>
+              <div class="field wide"><button id="apply" class="primary">설정 적용</button></div>
+            </div>
+            <div class="msg" id="msg">시간 제한은 현재 핸드를 끝낸 뒤 적용합니다.</div>
+          </div>
+        </section>
+
+        <section class="tabPanel logTab">
+          <div class="panel logPanel">
+            <h3>액션 로그</h3>
+            <div id="log" class="log"></div>
+            <div class="small note">봇은 LLM이 아니라 브라우저에서 즉시 계산되는 규칙 기반 알고리즘입니다.</div>
+          </div>
+        </section>
+      </div>
+    </aside>
   </div>
- </div>
 </div>
-<script src="app.js?v=72"></script>
+<script src="app.js?v=80"></script>
 </body>
 </html>
