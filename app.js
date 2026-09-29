@@ -1,5 +1,5 @@
 "use strict";
-const V="8.1",KEY="pokerTrainerState",R=["2","3","4","5","6","7","8","9","T","J","Q","K","A"],S=["♠","♥","♦","♣"],RV=Object.fromEntries(R.map((r,i)=>[r,i+2])),H=0,SB=50,BB=100,START=10000;
+const V="8.2",KEY="pokerTrainerState",R=["2","3","4","5","6","7","8","9","T","J","Q","K","A"],S=["♠","♥","♦","♣"],RV=Object.fromEntries(R.map((r,i)=>[r,i+2])),H=0,SB=50,BB=100,START=10000;
 const CAT=["하이카드","원페어","투페어","트립스","스트레이트","플러시","풀하우스","포카드","스트레이트 플러시"];
 const T=[{name:"나",style:"Human",type:"human"},{name:"Bot A",style:"TAG · 정석",type:"tag"},{name:"Bot B",style:"LAG · 공격",type:"lag"},{name:"Bot C",style:"Calling Station",type:"call"}];
 
@@ -157,6 +157,52 @@ function preflopReview(k,to){
   if(action==="fold")return mk("Best",0,"Fold","큰 프리플랍 재레이즈에 범위 정리","낮음","Facing 4-bet+");
   return mk("Blunder",1.2,"Fold","4-bet+ 상대로 너무 넓게 계속 플레이","낮음","Facing 4-bet+");
 }
+
+function simpleGrade(g){
+  return {Best:"🟢 정답에 가까움",Good:"🟢 좋은 선택",Inaccuracy:"🟡 조금 아쉬움",Mistake:"🟠 실수",Blunder:"🔴 큰 실수"}[g]||g;
+}
+function simpleRec(rec){
+  return String(rec||"")
+    .replace(/Raise\/Call mix/gi,"레이즈 또는 콜")
+    .replace(/4-bet bluff \/ Fold mix/gi,"다시 레이즈 또는 다이")
+    .replace(/4-bet/gi,"다시 레이즈")
+    .replace(/3-bet/gi,"다시 레이즈")
+    .replace(/Raise/gi,"레이즈")
+    .replace(/Call/gi,"콜")
+    .replace(/Fold/gi,"다이")
+    .replace(/Continue/gi,"계속 플레이");
+}
+function simpleReason(r){
+  const d=r.detail||"",sp=r.spot||"";
+  if(d.includes("기준 RFI 범위 안"))return "이 자리에서는 이 패로 먼저 레이즈하는 게 기본입니다.";
+  if(d.includes("기준 오픈 범위 밖"))return "이 자리에서는 이 패를 버리는 게 기본입니다.";
+  if(d.includes("오픈해야 할 핸드를 폴드"))return "이 패는 버리기보다 먼저 레이즈하는 편이 좋습니다.";
+  if(d.includes("기준보다 너무 넓은 오픈"))return "이 패까지 레이즈하면 너무 많은 패로 들어가게 됩니다.";
+  if(d.includes("오픈 림프"))return "아무도 레이즈하지 않았다면 이 패는 레이즈하거나 버리는 쪽이 기본입니다.";
+  if(d.includes("SB는 GTO에서 림프와 레이즈"))return "스몰블라인드에서는 이 패로 콜이나 레이즈 둘 다 가능합니다.";
+  if(d.includes("플레이 가능한 SB 범위를 폴드"))return "스몰블라인드에서 이 패는 버리기엔 아깝습니다.";
+  if(d.includes("SB 참가 범위보다 넓음"))return "스몰블라인드라도 이 패까지 들어가면 너무 넓습니다.";
+  if(d.includes("무료 플랍"))return "추가 칩 없이 다음 카드를 볼 수 있으니 체크가 기본입니다.";
+  if(d.includes("3-bet 사이징에 근접"))return "상대 레이즈에 다시 레이즈할 만큼 강하고, 금액도 적당합니다.";
+  if(d.includes("3-bet 선택은 좋고"))return "다시 레이즈하는 선택은 좋습니다. 금액만 조금 다듬으면 됩니다.";
+  if(d.includes("3-bet 우선"))return "이 패는 콜보다 다시 레이즈하는 쪽을 더 자주 씁니다.";
+  if(d.includes("continue/3-bet 핸드를 폴드"))return "상대가 레이즈했어도 이 패는 버리기엔 너무 강합니다.";
+  if(d.includes("continue 범위 안"))return "상대가 레이즈했지만 이 패는 콜해서 계속할 만합니다.";
+  if(d.includes("3-bet 빈도를 과하게"))return "계속 플레이는 맞지만, 다시 레이즈하기엔 조금 약합니다.";
+  if(d.includes("방어 가능한 핸드를 폴드"))return "상대 레이즈에도 이 패는 콜할 만합니다.";
+  if(d.includes("방어 범위 밖"))return "상대가 먼저 레이즈했다면 이 패는 버리는 편이 기본입니다.";
+  if(d.includes("오픈 상대로 너무 넓게 방어"))return "상대 레이즈에 이 패까지 따라가면 너무 넓게 플레이하게 됩니다.";
+  if(d.includes("4-bet 핵심 범위"))return "레이즈가 여러 번 나와도 계속 강하게 밀 수 있는 최상위 패입니다.";
+  if(d.includes("프리미엄 핸드를 3-bet에 폴드"))return "이 정도 강한 패를 여기서 버리면 너무 아깝습니다.";
+  if(d.includes("블러프 혼합 후보"))return "이 패는 가끔 다시 레이즈하는 블러프로 쓰고, 가끔 버리는 패입니다.";
+  if(d.includes("3-bet 방어 범위"))return "상대의 재레이즈에도 이 패는 콜해서 계속할 수 있습니다.";
+  if(d.includes("큰 프리플랍 재레이즈"))return "레이즈가 여러 번 나온 상황에서는 이 패를 정리하는 게 안전합니다.";
+  if(d.includes("4-bet 상대로도 계속"))return "여러 번 재레이즈가 나와도 계속할 만큼 매우 강한 패입니다.";
+  if(d.includes("오픈 자체는 맞지만 사이징"))return "레이즈한 판단은 맞고, 금액만 표준보다 조금 큽니다.";
+  if(d.includes("오픈은 맞고 사이징만"))return "레이즈한 판단은 맞고, 금액만 조금 다릅니다.";
+  return d || (sp.includes("RFI")?"이 자리에서의 기본 시작 패 범위를 기준으로 평가했습니다.":"상대의 프리플랍 레이즈에 대한 기본 대응을 기준으로 평가했습니다.");
+}
+
 function recordReview(r){
   if(!r)return;
   G.review=r;
@@ -252,7 +298,7 @@ function bot(i){
  if(a>.33-(lo-.5)*.18||(type==="call"&&Math.random()<.14))return{kind:"call"};if(type==="lag"&&Math.random()<bl&&p.stack>call+G.min)return{kind:"raise",to:Math.min(p.sc+p.stack,G.bet+Math.max(G.min,r50(G.pot*.55)))};return{kind:"fold"};
 }
 function run(){clearTimeout(bt);render();if(G.over||cfg.stopped)return;if(G.actor===null){advance();return}if(G.actor===H)return;let a=G.actor,d=bot(a);bt=setTimeout(()=>{if(!G.over&&!cfg.stopped&&G.actor===a)act(a,d.kind,d.to)},cfg.botDelay)}
-function coach(k,call){let p=G.p[H],m="";if(G.street==="preflop"){if(G.review)m=`${G.review.grade}: 추천 ${G.review.rec}. ${G.review.detail}`;else{let s=pre(p.hole);if(k==="fold")m=s<.35?"깔끔한 폴드입니다.":"조금 타이트할 수 있습니다.";if(k==="call")m="콜. 가격뿐 아니라 지배당할 가능성도 같이 보세요.";if(k==="raise")m="레이즈. 포지션과 상대 성향도 함께 보세요."}}else{if(k==="fold")m="이미 넣은 칩은 잊고 앞으로 낼 칩만 판단하세요.";if(k==="check")m="체크로 팟을 통제했습니다.";if(k==="call")m="콜. 팟오즈와 상대 범위가 핵심입니다.";if(k==="raise")m="베팅/레이즈. 밸류인지 블러프인지 목적을 분명히 해보세요."}$("coach").textContent=m}
+function coach(k,call){let p=G.p[H],m="";if(G.street==="preflop"){if(G.review)m=`${simpleGrade(G.review.grade)} · 추천 ${simpleRec(G.review.rec)}. ${simpleReason(G.review)}`;else{let s=pre(p.hole);if(k==="fold")m=s<.35?"깔끔한 폴드입니다.":"조금 타이트할 수 있습니다.";if(k==="call")m="콜. 가격뿐 아니라 지배당할 가능성도 같이 보세요.";if(k==="raise")m="레이즈. 포지션과 상대 성향도 함께 보세요."}}else{if(k==="fold")m="이미 넣은 칩은 잊고 앞으로 낼 칩만 판단하세요.";if(k==="check")m="체크로 팟을 통제했습니다.";if(k==="call")m="콜. 팟오즈와 상대 범위가 핵심입니다.";if(k==="raise")m="베팅/레이즈. 밸류인지 블러프인지 목적을 분명히 해보세요."}$("coach").textContent=m}
 function size(f){let p=G.p[H],call=Math.max(0,G.bet-p.sc),t;if(G.bet===0)t=p.sc+r50(G.pot*f);else t=p.sc+call+r50((G.pot+call)*f);let min=G.bet===0?BB:G.bet+G.min,max=p.sc+p.stack;return Math.min(max,Math.max(min,r50(t)))}
 
 function card(c){return`<div class="card ${red(c)?"red":""}"><span>${c.r}</span><span>${c.s}</span></div>`}function back(){return'<div class="card back">X</div>'}
@@ -268,10 +314,10 @@ function render(){
      const st=G.gtoStats||{n:0,loss:0};
      const acc=st.n?Math.round(((st.Best||0)+(st.Good||0))/st.n*100):0;
      gf.className="gtoFeedback "+cls;
-     gf.innerHTML=`<b>${G.review.grade} · ≈-${(G.review.loss||0).toFixed(2)}BB</b><span>${G.review.hand} · ${G.review.spot} · 추천: ${G.review.rec} · ${G.review.detail} · 신뢰도 ${G.review.confidence} · 세션 정확도 ${acc}%</span>`;
+     gf.innerHTML=`<b>${simpleGrade(G.review.grade)}</b><span>추천: ${simpleRec(G.review.rec)} · ${simpleReason(G.review)}</span>`;
    }else{
      gf.className="gtoFeedback idle";
-     gf.innerHTML="<b>Preflop GTO-lite</b><span>액션 후 바로 평가합니다. RFI는 기준 범위, 재레이즈 구간은 간소화 추정입니다.</span>";
+     gf.innerHTML="<b>프리플랍 코치</b><span>먼저 선택해보세요. 누른 뒤 추천 행동과 이유를 한 줄로 알려드립니다.</span>";
    }
  }
  let r=G.result?`<br><span class="good">${G.result}</span>`:"";$("status").innerHTML=`Hand #${G.n} · ${G.street.toUpperCase()}${r}<div class="mine">🂠 내 패 <b>${me.hole.map(ct).join(" ")||"-"}</b></div>`;
