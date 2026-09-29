@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Poker Trainer v8.0</title>
-<link rel="stylesheet" href="style.css?v=80">
+<title>Poker Trainer v8.1</title>
+<link rel="stylesheet" href="style.css?v=81">
 </head>
 <body>
 <input type="checkbox" id="mobilePanelToggle" hidden>
 <div class="app">
   <header class="top">
     <div>
-      <div class="brand">♠ 4-Max Poker Trainer <span class="badge">v8.0</span></div>
-      <div class="sub">태블릿/폰 전용 레이아웃 · 자동 저장 · 자동 다음 핸드 · 규칙 기반 봇</div>
+      <div class="brand">♠ 4-Max Poker Trainer <span class="badge">v8.1</span></div>
+      <div class="sub">태블릿/폰 전용 UI · 자동 저장 · Preflop GTO-lite 실시간 피드백</div>
     </div>
     <div class="topBtns">
       <label for="mobilePanelToggle" class="mobileInfoBtn">정보/설정</label>
@@ -59,6 +59,9 @@
           <button data-f=".667">⅔ 팟</button>
           <button data-f="1">팟</button>
         </div>
+        <div id="gtoFeedback" class="gtoFeedback idle">
+          <b>Preflop GTO-lite</b><span>액션 후 바로 평가합니다. 정확한 solver EV가 아닌 학습용 간소화 기준입니다.</span>
+        </div>
       </section>
     </main>
 
@@ -90,7 +93,7 @@
             <h3>이번 핸드 투자</h3>
             <div id="summary" class="sum"></div>
             <h3 class="coachHeading">즉석 코치</h3>
-            <div id="coach" class="coach">액션하면 짧게 코멘트합니다.</div>
+            <div id="coach" class="coach">프리플랍은 GTO-lite 기준으로 즉시 평가합니다.</div>
           </div>
         </section>
 
@@ -109,7 +112,7 @@
               <div class="field wide"><label class="check"><input id="bust" type="checkbox" checked> 한 명 파산하면 세션 종료</label></div>
               <div class="field wide"><button id="apply" class="primary">설정 적용</button></div>
             </div>
-            <div class="msg" id="msg">시간 제한은 현재 핸드를 끝낸 뒤 적용합니다.</div>
+            <div class="msg" id="msg">추천: 20~30분 세션. 시간 제한은 현재 핸드를 끝낸 뒤 적용합니다.</div>
           </div>
         </section>
 
@@ -117,26 +120,13 @@
           <div class="panel logPanel">
             <h3>액션 로그</h3>
             <div id="log" class="log"></div>
-            <div class="small note">봇은 LLM이 아니라 브라우저에서 즉시 계산되는 규칙 기반 알고리즘입니다.</div>
+            <div class="small note">RFI 평가는 100BB cash의 구현 가능한 GTO 범위를 기준으로 하고, facing-raise 평가는 간소화 휴리스틱입니다.</div>
           </div>
         </section>
       </div>
     </aside>
   </div>
 </div>
-<script src="app.js?v=80"></script>
-<script>
-(function(){
-  const base=window.render;
-  if(typeof base==='function'){
-    window.render=function(){
-      base();
-      const info=document.getElementById('info');
-      if(info) info.textContent=info.textContent.replace(/버전\s+\S+/,'버전 8.0');
-    };
-    window.render();
-  }
-})();
-</script>
+<script src="app.js?v=81"></script>
 </body>
 </html>
