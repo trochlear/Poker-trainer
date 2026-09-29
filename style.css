@@ -88,3 +88,5 @@ input,select{min-width:0;background:#0b1214;color:#fff;border:1px solid #455255;
 @media(max-width:699px), (max-height:520px) and (max-width:950px){
  .gtoFeedback{margin-top:4px;min-height:27px;padding:4px 6px;gap:5px;font-size:8px}.gtoFeedback b{font-size:8px}.gtoFeedback span{font-size:8px}
 }
+
+.gtoFeedback.mixed{border-color:#a66cff88;background:#7b4acb22}.gtoFeedback.mixed b{color:#c7a3ff}
