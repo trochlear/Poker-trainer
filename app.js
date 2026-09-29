@@ -1,7 +1,169 @@
 "use strict";
-const V="7.2",KEY="pokerTrainerState",R=["2","3","4","5","6","7","8","9","T","J","Q","K","A"],S=["♠","♥","♦","♣"],RV=Object.fromEntries(R.map((r,i)=>[r,i+2])),H=0,SB=50,BB=100,START=10000;
+const V="8.1",KEY="pokerTrainerState",R=["2","3","4","5","6","7","8","9","T","J","Q","K","A"],S=["♠","♥","♦","♣"],RV=Object.fromEntries(R.map((r,i)=>[r,i+2])),H=0,SB=50,BB=100,START=10000;
 const CAT=["하이카드","원페어","투페어","트립스","스트레이트","플러시","풀하우스","포카드","스트레이트 플러시"];
 const T=[{name:"나",style:"Human",type:"human"},{name:"Bot A",style:"TAG · 정석",type:"tag"},{name:"Bot B",style:"LAG · 공격",type:"lag"},{name:"Bot C",style:"Calling Station",type:"call"}];
+
+/* ---------- Preflop GTO-lite trainer ----------
+   RFI ranges are simplified 100bb cash "implementable GTO" baselines.
+   Facing-raise branches are deliberately simplified training heuristics,
+   so displayed EV loss is an educational estimate, not solver output. */
+const PR="23456789TJQKA";
+function rangeSet(spec){
+  const out=new Set();
+  for(const raw of spec.split(",").map(x=>x.trim()).filter(Boolean)){
+    if(!raw.endsWith("+")){out.add(raw);continue}
+    const t=raw.slice(0,-1);
+    if(t.length===2&&t[0]===t[1]){
+      for(let i=PR.indexOf(t[0]);i<PR.length;i++)out.add(PR[i]+PR[i]);
+    }else{
+      const suited=t.endsWith("s")?"s":t.endsWith("o")?"o":"";
+      const core=suited?t.slice(0,-1):t;
+      const hi=core[0],lo=core[1],hiI=PR.indexOf(hi),loI=PR.indexOf(lo);
+      if(hiI>loI)for(let i=loI;i<hiI;i++)out.add(hi+PR[i]+suited);
+    }
+  }
+  return out;
+}
+const RFI={
+  CO:rangeSet("33+,A2s+,K3s+,Q6s+,J8s+,T7s+,97s+,87s,76s,A8o+,KTo+,QTo+,JTo"),
+  BTN:rangeSet("33+,A2s+,K2s+,Q3s+,J4s+,T6s+,96s+,85s+,75s+,64s+,53s+,A4o+,K8o+,Q9o+,J9o+,T8o+,98o"),
+  SB:rangeSet("22+,A2s+,K2s+,Q2s+,J2s+,T3s+,94s+,84s+,74s+,63s+,53s+,43s,A2o+,K4o+,Q5o+,J7o+,T7o+,96o+,86o+,76o")
+};
+const THREE_IP=rangeSet("QQ+,AQs+,AKo,A5s,A4s");
+const CALL_IP=rangeSet("22+,A2s+,K9s+,Q9s+,J9s+,T9s,98s,87s,AQo,AJo,KQo,QJo,JTo");
+const THREE_SB=rangeSet("TT+,AJs+,AKo,A5s,A4s,KQs");
+const CALL_SB=rangeSet("22,33,44,55,66,77,88,99,A2s+,KTs+,QTs+,JTs,T9s,98s,AQo");
+const THREE_BB=rangeSet("JJ+,AQs+,AKo,A5s,A4s,KQs");
+const DEF_BB_CO=rangeSet("22+,A2s+,K6s+,Q8s+,J8s+,T8s+,97s+,87s,76s,65s,A7o+,K9o+,Q9o+,J9o+,T9o");
+const DEF_BB_BTN=rangeSet("22+,A2s+,K2s+,Q4s+,J6s+,T6s+,96s+,85s+,75s+,64s+,53s+,A2o+,K8o+,Q9o+,J9o+,T8o+,98o");
+const DEF_BB_SB=RFI.SB;
+const CONT_3B=rangeSet("TT+,AJs+,AQo+,KQs");
+const FOUR_BET=rangeSet("QQ+,AKs,AKo");
+const MIX_4B=rangeSet("A5s,A4s");
+const CONT_4B=rangeSet("QQ+,AKs,AKo,AQs");
+
+function handKey(h){
+  if(!h||h.length<2)return"";
+  let a=h[0],b=h[1],va=RV[a.r],vb=RV[b.r];
+  if(va===vb)return a.r+b.r;
+  let hi=va>vb?a:b,lo=va>vb?b:a;
+  return hi.r+lo.r+(hi.s===lo.s?"s":"o");
+}
+function gradeObj(grade,loss,rec,detail,confidence,spot,hand){
+  return{grade,loss,rec,detail,confidence,spot,hand};
+}
+function isIP(pos,opener){ return pos==="BTN"&&opener==="CO"; }
+function preflopReview(k,to){
+  const p=G.p[H],hand=handKey(p.hole),pos=p.pos,score=pre(p.hole);
+  const raises=Number.isFinite(G.preRaises)?G.preRaises:(G.bet>BB?1:0);
+  const openPos=G.preOpenPos||"상대";
+  const action=k==="check"?"check":k;
+  const premium=score>.72,trash=score<.22;
+  const mk=(g,l,r,d,cf,sp)=>gradeObj(g,l,r,d,cf,sp,hand);
+
+  if(raises===0){
+    if(pos==="CO"||pos==="BTN"){
+      const inRange=RFI[pos].has(hand),target=250;
+      if(inRange){
+        if(action==="raise"){
+          const dev=Math.abs((to||target)-target);
+          if(dev<=50)return mk("Best",0,`Raise ${target}`,"기준 RFI 범위 안 + 표준 2.5BB 오픈","높음",`${pos} RFI`);
+          if(dev<=100)return mk("Good",.05,`Raise ${target}`,`오픈은 맞고 사이징만 기준에서 ${dev}칩 차이`,"높음",`${pos} RFI`);
+          return mk("Inaccuracy",.15,`Raise ${target}`,"오픈 자체는 맞지만 사이징이 과하게 벗어남","높음",`${pos} RFI`);
+        }
+        if(action==="fold")return mk(premium?"Blunder":"Mistake",premium?1.6:.45,`Raise ${target}`,"오픈해야 할 핸드를 폴드함","높음",`${pos} RFI`);
+        return mk("Mistake",.35,`Raise ${target}`,"언오픈 팟의 오픈 림프는 간소화 기준에서 제외","높음",`${pos} RFI`);
+      }else{
+        if(action==="fold")return mk("Best",0,"Fold","기준 오픈 범위 밖","높음",`${pos} RFI`);
+        if(action==="raise")return mk(trash?"Mistake":"Inaccuracy",trash?.55:.18,"Fold","기준보다 너무 넓은 오픈","높음",`${pos} RFI`);
+        return mk("Mistake",.35,"Fold","범위 밖 핸드로 오픈 림프","높음",`${pos} RFI`);
+      }
+    }
+
+    if(pos==="SB"||pos==="BTN/SB"){
+      const playable=RFI.SB.has(hand),target=300;
+      if(playable){
+        if(action==="raise"){
+          const dev=Math.abs((to||target)-target);
+          return dev<=50?mk("Best",0,"Raise/Call mix","SB는 혼합전략이 많음. 레이즈 기준 사이즈는 3BB","중간","SB RFI"):mk("Good",.07,`Raise ${target} / Call mix`,"계속 플레이는 맞고 레이즈 사이징만 다름","중간","SB RFI");
+        }
+        if(action==="call")return mk("Good",.04,"Raise/Call mix","SB는 GTO에서 림프와 레이즈가 섞이는 구간이 큼","중간","SB RFI");
+        if(action==="fold")return mk(premium?"Blunder":"Mistake",premium?1.5:.4,"Raise/Call mix","플레이 가능한 SB 범위를 폴드함","중간","SB RFI");
+      }else{
+        if(action==="fold")return mk("Best",0,"Fold","기준 SB 참가 범위 밖","중간","SB RFI");
+        return mk("Mistake",trash?.55:.3,"Fold","SB 참가 범위보다 넓음","중간","SB RFI");
+      }
+    }
+
+    if(pos==="BB"){
+      if(action==="check")return mk("Best",0,"Check","무료 플랍을 보는 상황","중간","BB vs limp/check");
+      if(action==="raise")return mk(score>.48?"Good":"Inaccuracy",score>.48?.05:.18,"Check / strong hands Raise","BB 무레이즈 팟은 체크도 정상 선택","중간","BB vs limp/check");
+    }
+  }
+
+  if(raises===1){
+    let three,cont;
+    if(pos==="BTN"){three=THREE_IP;cont=CALL_IP}
+    else if(pos==="SB"){three=THREE_SB;cont=CALL_SB}
+    else if(pos==="BB"){
+      three=THREE_BB;
+      cont=openPos==="CO"?DEF_BB_CO:openPos==="BTN"?DEF_BB_BTN:DEF_BB_SB;
+    }else{three=THREE_IP;cont=CALL_IP}
+    const wants3=three.has(hand),wantsContinue=wants3||cont.has(hand);
+    const ip=isIP(pos,openPos),target=r50(G.bet*(ip?3.5:4));
+    if(wants3){
+      if(action==="raise"){
+        const dev=Math.abs((to||target)-target);
+        return dev<=100?mk("Best",0,`3-bet ${target}`,`${ip?"IP":"OOP"} 기준 3-bet 사이징에 근접`,"중간",`${pos} vs ${openPos} open`):mk("Good",.08,`3-bet ${target}`,"3-bet 선택은 좋고 사이징 조정 필요","중간",`${pos} vs ${openPos} open`);
+      }
+      if(action==="call")return mk("Inaccuracy",.15,`3-bet ${target}`,"계속 플레이는 맞지만 이 간소화 범위에서는 3-bet 우선","중간",`${pos} vs ${openPos} open`);
+      return mk(premium?"Blunder":"Mistake",premium?1.4:.5,`3-bet ${target}`,"강한 continue/3-bet 핸드를 폴드","중간",`${pos} vs ${openPos} open`);
+    }
+    if(wantsContinue){
+      if(action==="call")return mk("Best",0,"Call","간소화 continue 범위 안","중간",`${pos} vs ${openPos} open`);
+      if(action==="raise")return mk("Inaccuracy",.18,"Call","continue는 맞지만 3-bet 빈도를 과하게 늘림","중간",`${pos} vs ${openPos} open`);
+      return mk("Mistake",.38,"Call","방어 가능한 핸드를 폴드","중간",`${pos} vs ${openPos} open`);
+    }
+    if(action==="fold")return mk("Best",0,"Fold","간소화 방어 범위 밖","중간",`${pos} vs ${openPos} open`);
+    return mk(trash?"Blunder":"Mistake",trash?.9:.45,"Fold","오픈 상대로 너무 넓게 방어","중간",`${pos} vs ${openPos} open`);
+  }
+
+  if(raises===2){
+    const four=FOUR_BET.has(hand),mix=MIX_4B.has(hand),cont=CONT_3B.has(hand)||four||mix;
+    const ip=pos==="BTN",target=r50(G.bet*(ip?2.3:2.5));
+    if(four){
+      if(action==="raise")return mk("Best",0,`4-bet ${target}`,"강한 4-bet 핵심 범위","낮음","Facing 3-bet");
+      if(action==="call")return mk("Good",.08,`4-bet ${target} / 일부 call`,"강한 핸드라 계속 플레이는 정상","낮음","Facing 3-bet");
+      return mk("Blunder",1.7,`4-bet ${target}`,"프리미엄 핸드를 3-bet에 폴드","낮음","Facing 3-bet");
+    }
+    if(mix){
+      if(action==="raise"||action==="fold")return mk("Good",.05,"4-bet bluff / Fold mix","A5s/A4s 계열은 블러프 혼합 후보","낮음","Facing 3-bet");
+      return mk("Inaccuracy",.15,"4-bet/Fold mix","간소화 기준에서 콜 비중은 낮게 봄","낮음","Facing 3-bet");
+    }
+    if(cont){
+      if(action==="call")return mk("Best",0,"Call","간소화 3-bet 방어 범위","낮음","Facing 3-bet");
+      if(action==="fold")return mk("Mistake",.4,"Call","방어 가능한 강한 핸드를 폴드","낮음","Facing 3-bet");
+      return mk("Inaccuracy",.2,"Call","4-bet 범위보다 넓게 재레이즈","낮음","Facing 3-bet");
+    }
+    if(action==="fold")return mk("Best",0,"Fold","3-bet 방어 범위 밖","낮음","Facing 3-bet");
+    return mk(trash?"Blunder":"Mistake",trash?1.0:.5,"Fold","3-bet에 과도하게 계속 플레이","낮음","Facing 3-bet");
+  }
+
+  const cont4=CONT_4B.has(hand);
+  if(cont4){
+    if(action==="fold")return mk("Mistake",.7,"Continue","4-bet 상대로도 계속 가능한 최상단 범위","낮음","Facing 4-bet+");
+    return mk("Good",.05,"Continue","상위 프리플랍 범위로 계속 플레이","낮음","Facing 4-bet+");
+  }
+  if(action==="fold")return mk("Best",0,"Fold","큰 프리플랍 재레이즈에 범위 정리","낮음","Facing 4-bet+");
+  return mk("Blunder",1.2,"Fold","4-bet+ 상대로 너무 넓게 계속 플레이","낮음","Facing 4-bet+");
+}
+function recordReview(r){
+  if(!r)return;
+  G.review=r;
+  G.gtoStats=G.gtoStats||{n:0,loss:0,Best:0,Good:0,Inaccuracy:0,Mistake:0,Blunder:0};
+  G.gtoStats.n++;G.gtoStats.loss+=r.loss||0;G.gtoStats[r.grade]=(G.gtoStats[r.grade]||0)+1;
+}
+
 let cfg={auto:true,nextDelay:1200,botDelay:1000,durationEnd:0,untilEnd:0,maxHands:0,loss:0,profit:0,bust:true,stopped:false,reason:""},G={},bt=0,nt=0;
 
 const $=id=>document.getElementById(id),r50=n=>Math.max(50,Math.round(n/50)*50);
@@ -32,7 +194,7 @@ function positions(){
 }
 function blind(i,n,label){let p=G.p[i],x=Math.min(n,p.stack);p.stack-=x;p.sc+=x;p.hc+=x;p.last=`${label} ${x}`;if(!p.stack)p.allin=true}
 function log(s){G.log.push(s);if(G.log.length>250)G.log=G.log.slice(-250);render()}
-function reset(){timers();cfg={auto:true,nextDelay:1200,botDelay:1000,durationEnd:0,untilEnd:0,maxHands:0,loss:0,profit:0,bust:true,stopped:false,reason:""};G={p:T.map(fresh),d:3,n:0,dck:[],all:[],board:[],street:"idle",bet:0,min:BB,pot:0,need:new Set(),actor:null,over:true,reveal:false,sb:0,bb:0,log:[],lastC:[0,0,0,0],result:""};sync();newHand()}
+function reset(){timers();cfg={auto:true,nextDelay:1200,botDelay:1000,durationEnd:0,untilEnd:0,maxHands:0,loss:0,profit:0,bust:true,stopped:false,reason:""};G={p:T.map(fresh),d:3,n:0,dck:[],all:[],board:[],street:"idle",bet:0,min:BB,pot:0,need:new Set(),actor:null,over:true,reveal:false,sb:0,bb:0,log:[],lastC:[0,0,0,0],result:"",review:null,preRaises:0,preOpenPos:"",preOpenSize:0,gtoStats:{n:0,loss:0,Best:0,Good:0,Inaccuracy:0,Mistake:0,Blunder:0}};sync();newHand()}
 function reason(){
  let now=Date.now(),me=G.p?.[H];
  if(cfg.stopped)return cfg.reason||"사용자 정지";
@@ -48,7 +210,7 @@ function stop(r){cfg.stopped=true;cfg.reason=r||"세션 정지";timers();save();
 function nextAuto(){clearTimeout(nt);let r=reason();if(r){stop(r);return}if(cfg.auto&&G.over&&!cfg.stopped&&alive().length>=2)nt=setTimeout(newHand,cfg.nextDelay)}
 function newHand(){
  timers();let r=reason();if(r&&G.n){stop(r);return}if(alive().length<2){stop("게임 종료");return}
- G.n++;G.d=next(G.d);G.dck=shuffle(deck());G.all=[];G.board=[];G.street="preflop";G.bet=BB;G.min=BB;G.over=false;G.reveal=false;G.result="";
+ G.n++;G.d=next(G.d);G.dck=shuffle(deck());G.all=[];G.board=[];G.street="preflop";G.bet=BB;G.min=BB;G.over=false;G.reveal=false;G.result="";G.review=null;G.preRaises=0;G.preOpenPos="";G.preOpenSize=0;G.gtoStats=G.gtoStats||{n:0,loss:0,Best:0,Good:0,Inaccuracy:0,Mistake:0,Blunder:0};
  G.p.forEach(p=>{p.hole=[];p.fold=p.stack<=0;p.allin=false;p.sc=0;p.hc=0;p.last="";p.pos=""});positions();
  let a=alive(),i=next(G.d);for(let r=0;r<2;r++)for(let c=0;c<a.length;c++){G.p[i].hole.push(G.dck.pop());i=next(i)}for(let x=0;x<5;x++)G.all.push(G.dck.pop());
  blind(G.sb,SB,"SB");blind(G.bb,BB,"BB");pot();G.need=new Set(a.filter(i=>!G.p[i].allin));G.actor=nextIn(G.bb);log(`— Hand #${G.n} 시작 —`);log(`BTN ${G.p[G.d].name} · SB ${G.p[G.sb].name} · BB ${G.p[G.bb].name}`);run();
@@ -57,13 +219,13 @@ function pay(i,n){let p=G.p[i],x=Math.min(n,p.stack);p.stack-=x;p.sc+=x;p.hc+=x;
 function clean(){for(const i of[...G.need]){let p=G.p[i];if(p.fold||p.allin||!p.stack)G.need.delete(i)}}
 function nxt(i){for(let k=1;k<=4;k++){let j=(i+k)%4;if(G.need.has(j)&&!G.p[j].fold&&!G.p[j].allin)return j}return null}
 function act(i,k,to=0){
- if(G.over||cfg.stopped||i!==G.actor)return;let p=G.p[i],call=Math.max(0,G.bet-p.sc),txt="";
+ if(G.over||cfg.stopped||i!==G.actor)return;let p=G.p[i],call=Math.max(0,G.bet-p.sc),txt="";if(i===H&&G.street==="preflop")recordReview(preflopReview(k,to));
  if(k==="fold"){p.fold=true;G.need.delete(i);txt="다이"}
  else if(k==="check"){if(call)return;G.need.delete(i);txt="체크"}
  else if(k==="call"){if(!call){G.need.delete(i);txt="체크"}else{let x=pay(i,call);G.need.delete(i);txt=x<call?`올인 콜 ${x}`:`콜 ${x}`}}
  else if(k==="raise"){
   let max=p.sc+p.stack,target=Math.min(r50(to),max),min=G.bet===0?BB:G.bet+G.min;if(target<=G.bet)return;if(target<min&&target<max)target=min;
-  let old=G.bet,x=pay(i,target-p.sc),actual=p.sc;if(actual<=old){G.need.delete(i);txt=`콜 ${x}`}else{let rs=actual-old;if(rs>=G.min)G.min=rs;G.bet=actual;G.need=new Set(live().filter(j=>j!==i&&!G.p[j].allin&&G.p[j].stack>0));txt=old?`레이즈 ${actual}`:`베팅 ${actual}`}
+  let old=G.bet,x=pay(i,target-p.sc),actual=p.sc;if(actual<=old){G.need.delete(i);txt=`콜 ${x}`}else{let rs=actual-old;if(rs>=G.min)G.min=rs;G.bet=actual;if(G.street==="preflop"){G.preRaises=Number.isFinite(G.preRaises)?G.preRaises:0;if(G.preRaises===0){G.preOpenPos=p.pos;G.preOpenSize=actual}G.preRaises++}G.need=new Set(live().filter(j=>j!==i&&!G.p[j].allin&&G.p[j].stack>0));txt=old?`레이즈 ${actual}`:`베팅 ${actual}`}
  }
  p.last=txt;log(`${p.name}: ${txt}`);if(i===H)coach(k,call);clean();if(live().length===1){foldWin(live()[0]);return}if(!G.need.size){advance();return}G.actor=nxt(i);run();
 }
@@ -90,7 +252,7 @@ function bot(i){
  if(a>.33-(lo-.5)*.18||(type==="call"&&Math.random()<.14))return{kind:"call"};if(type==="lag"&&Math.random()<bl&&p.stack>call+G.min)return{kind:"raise",to:Math.min(p.sc+p.stack,G.bet+Math.max(G.min,r50(G.pot*.55)))};return{kind:"fold"};
 }
 function run(){clearTimeout(bt);render();if(G.over||cfg.stopped)return;if(G.actor===null){advance();return}if(G.actor===H)return;let a=G.actor,d=bot(a);bt=setTimeout(()=>{if(!G.over&&!cfg.stopped&&G.actor===a)act(a,d.kind,d.to)},cfg.botDelay)}
-function coach(k,call){let p=G.p[H],m="";if(G.street==="preflop"){let s=pre(p.hole);if(k==="fold")m=s<.35?"깔끔한 폴드입니다.":"조금 타이트할 수 있습니다.";if(k==="call")m="콜. 가격뿐 아니라 지배당할 가능성도 같이 보세요.";if(k==="raise")m="레이즈. 포지션과 상대 성향도 함께 보세요."}else{if(k==="fold")m="이미 넣은 칩은 잊고 앞으로 낼 칩만 판단하세요.";if(k==="check")m="체크로 팟을 통제했습니다.";if(k==="call")m="콜. 팟오즈와 상대 범위가 핵심입니다.";if(k==="raise")m="베팅/레이즈. 밸류인지 블러프인지 목적을 분명히 해보세요."}$("coach").textContent=m}
+function coach(k,call){let p=G.p[H],m="";if(G.street==="preflop"){if(G.review)m=`${G.review.grade}: 추천 ${G.review.rec}. ${G.review.detail}`;else{let s=pre(p.hole);if(k==="fold")m=s<.35?"깔끔한 폴드입니다.":"조금 타이트할 수 있습니다.";if(k==="call")m="콜. 가격뿐 아니라 지배당할 가능성도 같이 보세요.";if(k==="raise")m="레이즈. 포지션과 상대 성향도 함께 보세요."}}else{if(k==="fold")m="이미 넣은 칩은 잊고 앞으로 낼 칩만 판단하세요.";if(k==="check")m="체크로 팟을 통제했습니다.";if(k==="call")m="콜. 팟오즈와 상대 범위가 핵심입니다.";if(k==="raise")m="베팅/레이즈. 밸류인지 블러프인지 목적을 분명히 해보세요."}$("coach").textContent=m}
 function size(f){let p=G.p[H],call=Math.max(0,G.bet-p.sc),t;if(G.bet===0)t=p.sc+r50(G.pot*f);else t=p.sc+call+r50((G.pot+call)*f);let min=G.bet===0?BB:G.bet+G.min,max=p.sc+p.stack;return Math.min(max,Math.max(min,r50(t)))}
 
 function card(c){return`<div class="card ${red(c)?"red":""}"><span>${c.r}</span><span>${c.s}</span></div>`}function back(){return'<div class="card back">X</div>'}
@@ -99,6 +261,19 @@ function remain(ms){if(ms<=0)return"종료 대기";let m=Math.floor(ms/60000),s=
 function render(){
  if(!G.p)return;for(let i=0;i<4;i++)seat(i);$("board").innerHTML=G.board.map(card).join("");$("pot").textContent=`Pot ${G.pot.toLocaleString()}`;$("hPot").innerHTML=`Pot <b>${G.pot.toLocaleString()}</b>`;$("street").textContent=G.street.toUpperCase();$("hStreet").textContent=G.street.toUpperCase();
  let me=G.p[H],actor=G.actor==null?"-":G.p[G.actor].name;$("hTurn").textContent=`현재 차례: ${cfg.stopped?"세션 정지":G.over?"핸드 종료":actor}`;
+ const gf=$("gtoFeedback");
+ if(gf){
+   if(G.review){
+     const cls=G.review.grade.toLowerCase();
+     const st=G.gtoStats||{n:0,loss:0};
+     const acc=st.n?Math.round(((st.Best||0)+(st.Good||0))/st.n*100):0;
+     gf.className="gtoFeedback "+cls;
+     gf.innerHTML=`<b>${G.review.grade} · ≈-${(G.review.loss||0).toFixed(2)}BB</b><span>${G.review.hand} · ${G.review.spot} · 추천: ${G.review.rec} · ${G.review.detail} · 신뢰도 ${G.review.confidence} · 세션 정확도 ${acc}%</span>`;
+   }else{
+     gf.className="gtoFeedback idle";
+     gf.innerHTML="<b>Preflop GTO-lite</b><span>액션 후 바로 평가합니다. RFI는 기준 범위, 재레이즈 구간은 간소화 추정입니다.</span>";
+   }
+ }
  let r=G.result?`<br><span class="good">${G.result}</span>`:"";$("status").innerHTML=`Hand #${G.n} · ${G.street.toUpperCase()}${r}<div class="mine">🂠 내 패 <b>${me.hole.map(ct).join(" ")||"-"}</b></div>`;
  let call=Math.max(0,G.bet-me.sc);$("info").textContent=`현재 베팅 ${G.bet.toLocaleString()} · 내 콜 ${Math.min(call,me.stack).toLocaleString()} · 버전 ${V}`;
  $("summary").innerHTML=G.p.map((p,i)=>{let h=G.over?(G.lastC?.[i]||0):p.hc;return`<div class="sumrow"><span>${p.name}${!G.over&&G.actor===i?" ▶":""}</span><span>핸드 <strong>${h.toLocaleString()}</strong> / 스트리트 <strong>${p.sc.toLocaleString()}</strong></span></div>`}).join("");
