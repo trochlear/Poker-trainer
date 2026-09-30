@@ -1,5 +1,5 @@
 "use strict";
-const V="8.3",KEY="pokerTrainerState",R=["2","3","4","5","6","7","8","9","T","J","Q","K","A"],S=["♠","♥","♦","♣"],RV=Object.fromEntries(R.map((r,i)=>[r,i+2])),H=0,SB=50,BB=100,START=10000;
+const V="8.4",KEY="pokerTrainerState",R=["2","3","4","5","6","7","8","9","T","J","Q","K","A"],S=["♠","♥","♦","♣"],RV=Object.fromEntries(R.map((r,i)=>[r,i+2])),H=0,SB=50,BB=100,START=10000;
 const CAT=["하이카드","원페어","투페어","트립스","스트레이트","플러시","풀하우스","포카드","스트레이트 플러시"];
 const T=[{name:"나",style:"Human",type:"human"},{name:"Bot A",style:"TAG · 정석",type:"tag"},{name:"Bot B",style:"LAG · 공격",type:"lag"},{name:"Bot C",style:"Calling Station",type:"call"}];
 
@@ -321,6 +321,18 @@ function size(f){let p=G.p[H],call=Math.max(0,G.bet-p.sc),t;if(G.bet===0)t=p.sc+
 
 function card(c){return`<div class="card ${red(c)?"red":""}"><span>${c.r}</span><span>${c.s}</span></div>`}function back(){return'<div class="card back">X</div>'}
 function seat(i){let p=G.p[i],show=i===H||G.reveal,cards=p.hole.length?(show?p.hole.map(card).join(""):back()+back()):"",turn=!G.over&&G.actor===i,hand=G.over?(G.lastC?.[i]||0):p.hc;let e=$("seat"+i);e.className=`seat s${i}${turn?" turn":""}${p.fold?" fold":""}`;e.innerHTML=`<div class="head"><div><div class="nl"><span class="dot ${turn?"on":""}"></span><span class="name">${p.name}</span><span class="pos">${p.pos}</span></div><div class="style">${p.style}</div></div><div class="stack">${p.stack.toLocaleString()}</div></div><div class="cards">${cards}</div><div class="stats"><div class="stat"><div class="lab">이번 핸드</div><div class="val">${hand.toLocaleString()}</div></div><div class="stat"><div class="lab">스트리트</div><div class="val">${p.sc.toLocaleString()}</div></div></div><div class="act">${p.last||"대기"}</div>`}
+function currentHandLog(){
+  if(!G.log||!G.log.length)return[];
+  const marker=`— Hand #${G.n} 시작 —`;
+  let idx=G.log.lastIndexOf(marker);
+  if(idx<0){
+    for(let i=G.log.length-1;i>=0;i--){
+      if(String(G.log[i]).includes("Hand #")){idx=i;break}
+    }
+  }
+  const lines=idx>=0?G.log.slice(idx):G.log.slice(-8);
+  return lines.slice(-7);
+}
 function remain(ms){if(ms<=0)return"종료 대기";let m=Math.floor(ms/60000),s=Math.floor(ms%60000/1000);return m?`${m}분 ${s}초`:`${s}초`}
 function render(){
  if(!G.p)return;for(let i=0;i<4;i++)seat(i);$("board").innerHTML=G.board.map(card).join("");$("pot").textContent=`Pot ${G.pot.toLocaleString()}`;$("hPot").innerHTML=`Pot <b>${G.pot.toLocaleString()}</b>`;$("street").textContent=G.street.toUpperCase();$("hStreet").textContent=G.street.toUpperCase();
@@ -344,6 +356,8 @@ function render(){
  let mine=!G.over&&!cfg.stopped&&G.actor===H;$("controls").style.opacity=mine?"1":".55";["fold","call","amount","raise"].forEach(id=>$(id).disabled=!mine);document.querySelectorAll(".sizeActions button").forEach(b=>b.disabled=!mine);
  $("ctitle").textContent=cfg.stopped?`세션 정지: ${cfg.reason}`:mine?"내 차례 · 액션 선택":G.over?(cfg.auto?"다음 핸드 자동 대기 중":"핸드 종료"):`${actor} 생각 중…`;
  if(mine){$("call").textContent=call?`콜 ${Math.min(call,me.stack).toLocaleString()}`:"체크";let min=G.bet===0?BB:G.bet+G.min,max=me.sc+me.stack,a=$("amount");if(+a.value<Math.min(min,max)||+a.value>max)a.value=Math.min(max,Math.max(min,G.street==="preflop"&&G.bet<=BB?250:r50(G.pot*.5+G.bet)));a.min=Math.min(min,max);a.max=max;$("raise").textContent=G.bet?"레이즈":"베팅"}
+ const mini=$("handLogMini");
+ if(mini)mini.innerHTML=currentHandLog().map(x=>`<div>${x}</div>`).join("");
  $("log").innerHTML=G.log.map(x=>`<div>${x}</div>`).join("");$("log").scrollTop=$("log").scrollHeight;$("pause").textContent=cfg.stopped?"세션 재개":"세션 정지";save();clock();
 }
 function clock(){if(!G.p)return;let now=Date.now(),a=[];if(cfg.durationEnd)a.push(`남은 ${remain(cfg.durationEnd-now)}`);if(cfg.untilEnd)a.push(`${new Date(cfg.untilEnd).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}까지`);if(cfg.maxHands)a.push(`${G.n}/${cfg.maxHands}핸드`);$("hTimer").textContent=cfg.stopped?`정지: ${cfg.reason}`:(a.length?a.join(" · "):"세션 제한 없음")}
