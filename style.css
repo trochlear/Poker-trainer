@@ -96,7 +96,7 @@ input,select{min-width:0;background:#0b1214;color:#fff;border:1px solid #455255;
 @media(max-width:699px), (max-height:520px) and (max-width:950px){
   .handLogFloat{
     display:block;position:absolute;z-index:6;left:8px;top:8px;
-    width:132px;max-height:122px;overflow:hidden;
+    width:112px;max-height:122px;overflow:hidden;
     padding:7px 8px;border:1px solid #ffffff24;border-radius:10px;
     background:#07100ed9;box-shadow:0 5px 14px #0006;
     font-size:8px;line-height:1.34;color:#dce6e2;pointer-events:none
@@ -104,6 +104,7 @@ input,select{min-width:0;background:#0b1214;color:#fff;border:1px solid #455255;
   .handLogFloat>b{display:block;margin-bottom:4px;font-size:9px;color:#fff}
   #handLogMini{display:flex;flex-direction:column;gap:2px}
   #handLogMini div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .s2{left:66%;top:3px;transform:translateX(-50%)}
 
   .controls{padding:7px}
   .ctitle{font-size:10px;margin-bottom:6px}
