@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Poker Trainer Rebuild v1</title>
+<link rel="stylesheet" href="./styles.css?v=1">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <b>♠ Poker Trainer</b>
+      <span class="version">REBUILD v1</span>
+      <span class="modeNote">100BB · 4-max · 태블릿 우선</span>
+    </div>
+    <div class="topActions">
+      <button id="modeGame" class="active">실전 게임</button>
+      <button id="modeDrill">프리플랍 드릴</button>
+      <button id="panelBtn">정보/설정</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="gameColumn">
+      <div class="hud">
+        <span id="hudTurn">현재 차례 -</span>
+        <span id="hudPot">Pot 0</span>
+        <span id="hudStreet">PRE-FLOP</span>
+        <span id="hudTimer">30:00</span>
+      </div>
+
+      <div id="gameView" class="gameView">
+        <aside class="handRail">
+          <div class="railTitle">현재 핸드</div>
+          <div id="handLog" class="handLog"></div>
+        </aside>
+
+        <section class="tableWrap">
+          <div class="table">
+            <div id="seat0" class="seat seat0"></div>
+            <div id="seat1" class="seat seat1"></div>
+            <div id="seat2" class="seat seat2"></div>
+            <div id="seat3" class="seat seat3"></div>
+            <div class="tableCenter">
+              <div id="board" class="board"></div>
+              <div id="centerPot" class="centerPot">Pot 0</div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div id="drillView" class="drillView hidden">
+        <div class="drillCard">
+          <div class="drillTop">
+            <span id="drillPosition" class="positionBadge">BTN</span>
+            <span>앞사람 전원 폴드 · 100BB</span>
+          </div>
+          <div id="drillCards" class="drillCards"></div>
+          <div class="drillQuestion">이 자리에서 어떻게 시작할까?</div>
+          <div id="drillActions" class="drillActions">
+            <button data-drill="fold" class="foldBtn">다이</button>
+            <button data-drill="call" class="callBtn">콜</button>
+            <button data-drill="raise" class="raiseBtn">레이즈</button>
+          </div>
+          <div id="drillFeedback" class="feedback neutral">먼저 선택해보세요.</div>
+          <div id="drillStats" class="drillStats"></div>
+        </div>
+      </div>
+
+      <section id="controls" class="controls">
+        <div id="actionTitle" class="actionTitle">내 차례를 기다리는 중</div>
+        <div class="primaryActions">
+          <button id="foldBtn" class="foldBtn bigAction">다이</button>
+          <button id="callBtn" class="callBtn bigAction">체크/콜</button>
+          <div class="raiseCluster">
+            <input id="raiseAmount" type="number" step="50" value="250" aria-label="레이즈 금액">
+            <button id="raiseBtn" class="raiseBtn bigAction">레이즈</button>
+          </div>
+        </div>
+        <div class="sizes">
+          <button data-size=".333">⅓ 팟</button>
+          <button data-size=".5">½ 팟</button>
+          <button data-size=".667">⅔ 팟</button>
+          <button data-size="1">팟</button>
+          <button id="allInBtn">올인</button>
+        </div>
+        <div id="trainerFeedback" class="feedback neutral">
+          <b>프리플랍 코치</b> · 아무도 참가하지 않은 상황부터 정확하게 익힙니다.
+        </div>
+      </section>
+    </section>
+
+    <aside id="infoPanel" class="infoPanel">
+      <div class="panelHead">
+        <b>트레이닝 패널</b>
+        <button id="panelClose">닫기</button>
+      </div>
+      <div class="tabs">
+        <button data-tab="status" class="active">상황</button>
+        <button data-tab="session">세션</button>
+        <button data-tab="history">기록</button>
+        <button data-tab="about">기준</button>
+      </div>
+
+      <div class="tabBody">
+        <section data-pane="status" class="pane active">
+          <div class="panelBox">
+            <h3>현재 상황</h3>
+            <div id="statusText"></div>
+          </div>
+          <div class="panelBox">
+            <h3>정확한 수학</h3>
+            <div id="mathText" class="muted">상대 베팅을 마주하면 팟오즈를 표시합니다.</div>
+          </div>
+          <div class="panelBox">
+            <h3>이번 세션</h3>
+            <div id="sessionStats"></div>
+          </div>
+        </section>
+
+        <section data-pane="session" class="pane">
+          <div class="panelBox settings">
+            <h3>세션 설정</h3>
+            <label>플레이 시간(분)<input id="sessionMinutes" type="number" min="1" max="180" value="30"></label>
+            <label>봇 속도
+              <select id="botDelay">
+                <option value="650">빠름 0.65초</option>
+                <option value="900" selected>보통 0.9초</option>
+                <option value="1200">느림 1.2초</option>
+              </select>
+            </label>
+            <label>다음 핸드
+              <select id="nextDelay">
+                <option value="700">0.7초</option>
+                <option value="1100" selected>1.1초</option>
+                <option value="1800">1.8초</option>
+              </select>
+            </label>
+            <label class="check"><input id="autoNext" type="checkbox" checked> 자동 다음 핸드</label>
+            <button id="applySettings" class="accent">적용</button>
+            <button id="pauseSession">세션 일시정지</button>
+            <button id="newSession">새 세션</button>
+          </div>
+        </section>
+
+        <section data-pane="history" class="pane">
+          <div class="panelBox historyBox">
+            <h3>최근 핸드</h3>
+            <div id="historyList"></div>
+          </div>
+        </section>
+
+        <section data-pane="about" class="pane">
+          <div class="panelBox">
+            <h3>프리플랍 채점 원칙</h3>
+            <p>현재는 <b>아무도 참가하지 않은 100BB 팟</b>의 CO/BTN/SB만 채점합니다.</p>
+            <p>CO·BTN은 공개된 구현형 100BB 오픈 기준표를 사용합니다. SB 공개 기준은 ‘레이즈 또는 콜’ 합산 범위라서, 둘 중 어느 쪽이 더 좋은지는 억지로 채점하지 않습니다.</p>
+            <p><b>상대 레이즈를 마주한 상황은 아직 점수를 매기지 않습니다.</b> 대신 게임은 계속되고, 포스트플랍에서는 팟오즈 같은 확실한 수학만 보여줍니다.</p>
+            <p class="muted">목표: 모르는 상황을 GTO인 척하지 않기.</p>
+          </div>
+        </section>
+      </div>
+    </aside>
+  </main>
+</div>
+<script src="./app.js?v=1"></script>
+</body>
+</html>
